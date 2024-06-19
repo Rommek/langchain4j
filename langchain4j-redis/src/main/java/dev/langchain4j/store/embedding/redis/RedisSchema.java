@@ -25,10 +25,7 @@ class RedisSchema {
     private static final MetricType DEFAULT_METRIC_TYPE = COSINE;
 
     /* Redis schema field settings */
-
-    private String indexName;
-    @Builder.Default
-    private String prefix = "embedding:";
+    private String name;
     @Builder.Default
     private String vectorFieldName = "vector";
     @Builder.Default
@@ -71,12 +68,8 @@ class RedisSchema {
         return fields.toArray(new SchemaField[0]);
     }
 
-    String indexName() {
-        return indexName;
-    }
-
-    String prefix() {
-        return prefix;
+    String name() {
+        return name;
     }
 
     String vectorFieldName() {

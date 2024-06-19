@@ -45,7 +45,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
      * @param port         Redis Stack Server port
      * @param user         Redis Stack username (optional)
      * @param password     Redis Stack password (optional)
-     * @param indexName    The name of the index (optional). Default value: "embedding-index".
+     * @param name         Name used to identify Redis elements (optional). Default value: "embedding".
      * @param dimension    Embedding vector dimension
      * @param metadataKeys Metadata keys that should be persisted (optional)
      */
@@ -53,7 +53,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
                                Integer port,
                                String user,
                                String password,
-                               String indexName,
+                               String name,
                                Integer dimension,
                                Collection<String> metadataKeys) {
         ensureNotBlank(host, "host");
@@ -62,13 +62,13 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
 
         this.client = user == null ? new JedisPooled(host, port) : new JedisPooled(host, port, user, password);
         this.schema = RedisSchema.builder()
-                .indexName(getOrDefault(indexName, "embedding-index"))
+                .name(getOrDefault(name, "embedding"))
                 .dimension(dimension)
                 .metadataKeys(metadataKeys)
                 .build();
 
-        if (!isIndexExist(schema.indexName())) {
-            createIndex(schema.indexName());
+        if (!isIndexExist(schema.name())) {
+            createIndex(schema.name());
         }
     }
 
@@ -121,7 +121,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
                 .setSortBy(SCORE_FIELD_NAME, true)
                 .dialect(2);
 
-        SearchResult result = client.ftSearch(schema.indexName(), query);
+        SearchResult result = client.ftSearch(schema.name(), query);
         List<Document> documents = result.getDocuments();
 
         return toEmbeddingMatch(documents, minScore);
@@ -129,10 +129,10 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
 
     private void createIndex(String indexName) {
         IndexDefinition indexDefinition = new IndexDefinition(JSON);
-        indexDefinition.setPrefixes(schema.prefix());
+        indexDefinition.setPrefixes(schema.name());
         String res = client.ftCreate(indexName, FTCreateParams.createParams()
                 .on(IndexDataType.JSON)
-                .addPrefix(schema.prefix()), schema.toSchemaFields());
+                .addPrefix(schema.name()), schema.toSchemaFields());
         if (!"OK".equals(res)) {
             if (log.isErrorEnabled()) {
                 log.error("create index error, msg={}", res);
@@ -173,7 +173,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
                     fields.put(schema.scalarFieldName(), textSegment.text());
                     fields.putAll(textSegment.metadata().asMap());
                 }
-                String key = schema.prefix() + id;
+                String key = schema.name() + id;
                 pipeline.jsonSetWithEscape(key, Path2.of("$"), fields);
             }
 
@@ -197,7 +197,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
         return documents.stream()
                 .map(document -> {
                     double score = (2 - Double.parseDouble(document.getString(SCORE_FIELD_NAME))) / 2;
-                    String id = document.getId().substring(schema.prefix().length());
+                    String id = document.getId().substring(schema.name().length());
                     String text = document.hasProperty(schema.scalarFieldName()) ? document.getString(schema.scalarFieldName()) : null;
                     TextSegment embedded = null;
                     if (text != null) {
@@ -223,7 +223,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
         private Integer port;
         private String user;
         private String password;
-        private String indexName;
+        private String name;
         private Integer dimension;
         private Collection<String> metadataKeys = new ArrayList<>();
 
@@ -260,11 +260,11 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
         }
 
         /**
-         * @param indexName The name of the index (optional). Default value: "embedding-index".
+         * @param name The name of the index (optional). Default value: "embedding-index".
          * @return builder
          */
-        public Builder indexName(String indexName) {
-            this.indexName = indexName;
+        public Builder name(String name) {
+            this.name = name;
             return this;
         }
 
@@ -280,7 +280,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
         /**
          * @param metadataFieldsName metadata fields names (optional)
          * @deprecated use {@link #metadataKeys(Collection)} instead
-         */
+         *indexName/
         @Deprecated
         public Builder metadataFieldsName(Collection<String> metadataFieldsName) {
             this.metadataKeys = metadataFieldsName;
@@ -296,7 +296,7 @@ public class RedisEmbeddingStore implements EmbeddingStore<TextSegment> {
         }
 
         public RedisEmbeddingStore build() {
-            return new RedisEmbeddingStore(host, port, user, password, indexName, dimension, metadataKeys);
+            return new RedisEmbeddingStore(host, port, user, password, name, dimension, metadataKeys);
         }
     }
 }
